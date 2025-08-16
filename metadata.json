@@ -1,0 +1,9 @@
+{
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "name": "Copy of SSC BATCH 2022 ",
+  "description": "",
+  "prompt": ""
+}
