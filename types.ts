@@ -44,3 +44,9 @@ export interface WebRTCSignal {
   data: any;
   id: number;
 }
+
+export interface TypingIndicator {
+  userId: string;
+  userName: string;
+  timestamp: number;
+}

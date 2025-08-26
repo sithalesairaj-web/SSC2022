@@ -93,20 +93,6 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void }> = ({ onLogin }) => 
                     )}
                 </form>
             </div>
-             <div className="bg-white bg-opacity-90 backdrop-blur-sm rounded-2xl p-6 text-sm text-gray-700 shadow-lg">
-                <div className="text-center mb-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <h3 className="font-bold text-lg mt-2 text-gray-800">Get the App Experience!</h3>
-                </div>
-                <p className="text-center text-gray-600">
-                    For the best experience, install this app on your phone's home screen. It works offline and feels just like a native app.
-                </p>
-                <p className="mt-3 text-center text-xs text-gray-500">
-                    Look for the 'Install' button in the header after you log in, or use the 'Add to Home Screen' option in your browser menu.
-                </p>
-            </div>
         </div>
       </div>
   );

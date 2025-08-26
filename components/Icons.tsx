@@ -75,3 +75,10 @@ export const DownloadIcon: React.FC<{ className?: string }> = ({ className }) =>
 export const UploadIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zM9 16h6V10h4l-8-8-8 8h4v6z"></path></svg>
 );
+
+export const DictationMicIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 12c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2s2 .9 2 2v6c0 1.1-.9 2-2 2zm0-8c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1s1-.45-1-1V5c0-.55-.45-1-1-1z"/>
+        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+    </svg>
+);

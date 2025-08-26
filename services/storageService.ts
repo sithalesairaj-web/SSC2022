@@ -1,5 +1,5 @@
 
-import { User, Message, WebRTCSignal, UserRole, ApprovalStatus } from '../types';
+import { User, Message, WebRTCSignal, UserRole, ApprovalStatus, TypingIndicator } from '../types';
 import { LOCAL_STORAGE_KEYS, LEADER_ID } from '../constants';
 
 class StorageService {
@@ -86,6 +86,27 @@ class StorageService {
   readSignal(): WebRTCSignal | null {
     const signalJson = localStorage.getItem(LOCAL_STORAGE_KEYS.WEBRTC_SIGNAL);
     return signalJson ? JSON.parse(signalJson) : null;
+  }
+
+  // Typing Indicators
+  getTypingIndicators(): TypingIndicator[] {
+    const indicatorsJson = localStorage.getItem(LOCAL_STORAGE_KEYS.TYPING_INDICATORS);
+    const indicators: TypingIndicator[] = indicatorsJson ? JSON.parse(indicatorsJson) : [];
+    // Filter out stale indicators (older than 5 seconds)
+    return indicators.filter(indicator => Date.now() - indicator.timestamp < 5000);
+  }
+
+  updateTypingIndicator(userId: string, userName: string): void {
+    const indicators = this.getTypingIndicators().filter(i => i.userId !== userId);
+    const newIndicator: TypingIndicator = { userId, userName, timestamp: Date.now() };
+    indicators.push(newIndicator);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.TYPING_INDICATORS, JSON.stringify(indicators));
+  }
+
+  removeTypingIndicator(userId: string): void {
+    let indicators = this.getTypingIndicators();
+    indicators = indicators.filter(i => i.userId !== userId);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.TYPING_INDICATORS, JSON.stringify(indicators));
   }
 }
 

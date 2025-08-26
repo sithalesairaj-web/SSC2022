@@ -9,6 +9,7 @@ export const LOCAL_STORAGE_KEYS = {
   MESSAGES: 'ssc_batch_messages',
   CURRENT_USER: 'ssc_batch_current_user',
   WEBRTC_SIGNAL: 'ssc_batch_webrtc_signal',
+  TYPING_INDICATORS: 'ssc_batch_typing_indicators',
 };
 
 export const REJECTION_COOLDOWN_HOURS = 24;

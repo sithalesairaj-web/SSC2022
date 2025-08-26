@@ -1,9 +1,17 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Message, ApprovalStatus, MessageType } from '../types';
 import { MAX_IMAGE_SIZE_MB, AI_SENDER_ID, AI_SENDER_NAME } from '../constants';
-import { SendIcon, AttachmentIcon, CallIcon, AiIcon, MicOnIcon, StopIcon, ImageIcon } from './Icons';
+import { SendIcon, AttachmentIcon, CallIcon, AiIcon, MicOnIcon, StopIcon, ImageIcon, DictationMicIcon } from './Icons';
 import { GoogleGenAI } from '@google/genai';
+import { storageService } from '../services/storageService';
+
+// Add SpeechRecognition to the window object
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
 
 // Helper to format time
 const formatTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -19,16 +27,91 @@ const ChatPage: React.FC<{
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [isImageGenerating, setIsImageGenerating] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [isDictating, setIsDictating] = useState(false);
+    const [typingUsers, setTypingUsers] = useState<string[]>([]);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+    const recognitionRef = useRef<any | null>(null);
+    const typingTimeoutRef = useRef<number | null>(null);
 
     const approvedUsers = users.filter(u => u.status === ApprovalStatus.APPROVED);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+    
+    // Setup Speech Recognition
+    useEffect(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event: any) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                // We update with the final transcript part only to avoid duplication
+                 if (finalTranscript) {
+                    setText(prevText => prevText + finalTranscript);
+                }
+            };
+            
+            recognition.onend = () => {
+                setIsDictating(false);
+            };
+
+            recognition.onerror = (event: any) => {
+                console.error('Speech recognition error', event.error);
+                alert(`Speech recognition error: ${event.error}`);
+                setIsDictating(false);
+            };
+
+            recognitionRef.current = recognition;
+        }
+    }, []);
+
+    // Effect for polling typing indicators
+    useEffect(() => {
+        const pollTypingStatus = () => {
+            const indicators = storageService.getTypingIndicators();
+            const typingNames = indicators
+                .filter(i => i.userId !== user.id)
+                .map(i => i.userName);
+            
+            setTypingUsers(currentTypingUsers => {
+                if (JSON.stringify(currentTypingUsers) !== JSON.stringify(typingNames)) {
+                    return typingNames;
+                }
+                return currentTypingUsers;
+            });
+        };
+        
+        const interval = setInterval(pollTypingStatus, 1500);
+
+        return () => {
+            clearInterval(interval);
+            storageService.removeTypingIndicator(user.id);
+        };
+    }, [user.id, user.name]);
+    
+    const stopTyping = () => {
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+        storageService.removeTypingIndicator(user.id);
+    };
 
     const handleSend = () => {
         if (text.trim() && user) {
@@ -42,7 +125,20 @@ const ChatPage: React.FC<{
             };
             onAddMessage(newMessage);
             setText('');
+            stopTyping();
         }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setText(e.target.value);
+    
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        storageService.updateTypingIndicator(user.id, user.name);
+        typingTimeoutRef.current = window.setTimeout(() => {
+            storageService.removeTypingIndicator(user.id);
+        }, 3000);
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,7 +169,8 @@ const ChatPage: React.FC<{
     const handleAskAi = async () => {
         const prompt = text.trim();
         if (!prompt || !user) return;
-
+        
+        stopTyping();
         setIsAiLoading(true);
 
         const userMessage: Message = {
@@ -124,7 +221,8 @@ const ChatPage: React.FC<{
     const handleGenerateImage = async () => {
         const prompt = text.trim();
         if (!prompt || !user) return;
-    
+        
+        stopTyping();
         setIsImageGenerating(true);
     
         const userMessage: Message = {
@@ -222,10 +320,30 @@ const ChatPage: React.FC<{
         }
     };
     
+    const handleToggleDictation = () => {
+        if (!recognitionRef.current) {
+            alert("Speech recognition is not supported by your browser.");
+            return;
+        }
+        if (isDictating) {
+            recognitionRef.current.stop();
+        } else {
+            recognitionRef.current.start();
+        }
+        setIsDictating(!isDictating);
+    };
+    
+    const formatTypingMessage = (names: string[]): string => {
+        if (names.length === 1) return `${names[0]} is typing...`;
+        if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
+        return 'Several people are typing...';
+    };
+
     const getPlaceholderText = () => {
         if (isAiLoading) return "AI is thinking...";
         if (isImageGenerating) return "AI is creating an image...";
         if (isRecording) return "Recording audio...";
+        if (isDictating) return "Listening...";
         return "Type a message or an image prompt...";
     };
 
@@ -313,16 +431,28 @@ const ChatPage: React.FC<{
                     })}
                     <div ref={messagesEndRef} />
                 </div>
+                <div className="h-6 px-6 flex items-center">
+                    {typingUsers.length > 0 && (
+                        <p className="text-sm text-gray-500 italic animate-pulse">
+                            {formatTypingMessage(typingUsers)}
+                        </p>
+                    )}
+                </div>
                 <div className="p-4 bg-white border-t border-gray-200">
                     <div className="flex items-center space-x-2">
                         <input type="file" accept="image/png, image/jpeg, image/gif" ref={imageInputRef} onChange={handleImageUpload} className="hidden" id="image-upload" disabled={isInputDisabled} />
                         <button onClick={() => imageInputRef.current?.click()} className="p-2 text-gray-500 hover:text-blue-500 transition-colors rounded-full disabled:opacity-50" aria-label="Attach image" disabled={isInputDisabled}>
                             <AttachmentIcon className="w-6 h-6" />
                         </button>
+                        {recognitionRef.current && (
+                            <button onClick={handleToggleDictation} className={`p-2 rounded-full transition-colors disabled:opacity-50 ${isDictating ? 'text-red-500 animate-pulse' : 'text-gray-500 hover:text-blue-500'}`} aria-label="Dictate message" disabled={isAiLoading || isRecording || isImageGenerating}>
+                                <DictationMicIcon className="w-6 h-6" />
+                            </button>
+                        )}
                         <input
                             type="text"
                             value={text}
-                            onChange={(e) => setText(e.target.value)}
+                            onChange={handleInputChange}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !isInputDisabled && text.trim()) {
                                     handleSend();
@@ -331,7 +461,7 @@ const ChatPage: React.FC<{
                             placeholder={getPlaceholderText()}
                             className="flex-1 p-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-400 focus:border-transparent transition disabled:bg-slate-100"
                             aria-label="Chat message input"
-                            disabled={isInputDisabled}
+                            disabled={isInputDisabled || isDictating}
                         />
                          <button onClick={handleGenerateImage} className="bg-teal-500 text-white rounded-full p-3 hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Generate Image with AI" disabled={isInputDisabled || !text.trim()}>
                             <ImageIcon className="w-5 h-5" />
@@ -343,7 +473,7 @@ const ChatPage: React.FC<{
                             onClick={text.trim() && !isRecording ? handleSend : handleToggleRecording}
                             className={`flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full transition-colors text-white ${isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                             aria-label={getActionButtonLabel()}
-                            disabled={isAiLoading || isImageGenerating}
+                            disabled={isAiLoading || isImageGenerating || isDictating}
                         >
                             {isRecording 
                                 ? <StopIcon className="w-6 h-6" /> 
